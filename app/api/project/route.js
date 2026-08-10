@@ -5,25 +5,37 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const token = searchParams.get('token');
-    if (!id || !token) {
-      return Response.json({ error: 'id en token verplicht' }, { status: 400 });
-    }
 
     await ensureSchema();
     const sql = getSql();
-    const rows = await sql`
-      SELECT id, data, updated_at
-      FROM projects
-      WHERE id = ${id} AND share_token = ${token}
-      LIMIT 1
-    `;
+
+    let rows;
+
+    if (id && token) {
+      // Specifiek project ophalen via ID en token
+      rows = await sql`
+        SELECT id, share_token, data, updated_at
+        FROM projects
+        WHERE id = ${id} AND share_token = ${token}
+        LIMIT 1
+      `;
+    } else {
+      // GEEN parameters meegegeven? Pak het meest recent bijgewerkte project als standaard!
+      rows = await sql`
+        SELECT id, share_token, data, updated_at
+        FROM projects
+        ORDER BY updated_at DESC
+        LIMIT 1
+      `;
+    }
 
     if (!rows.length) {
-      return Response.json({ error: 'Project niet gevonden' }, { status: 404 });
+      return Response.json({ error: 'Geen project gevonden' }, { status: 404 });
     }
 
     return Response.json({
       id: rows[0].id,
+      token: rows[0].share_token,
       data: rows[0].data,
       updatedAt: rows[0].updated_at
     });
